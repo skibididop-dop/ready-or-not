@@ -255,7 +255,7 @@ var WALK_SPEED = 3.0, SPRINT_SPEED = 5.4, CROUCH_SPEED = 1.6, RUN_SPEED = 3.6;
 var PLAYER_RADIUS = 0.35, EYE_HEIGHT = 1.7, CROUCH_EYE = 1.15;
 var SENS = 0.0022;
 var CHARGE_TIME = 2.0, RELOAD_TIME = 1.4;
-var EXTRACTION_POINT = { x: 0, z: 7.5 };
+var EXTRACTION_POINT = { x: 0, z: 13.2 };
 
 /* =====================================================================
    UTILITIES
@@ -302,15 +302,15 @@ scene.add(flashlight.target);
 });
 
 var floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(34, 30),
+  new THREE.PlaneGeometry(40, 36),
   new THREE.MeshStandardMaterial({ color: 0x23261d, roughness: 0.95 })
 );
 floor.rotation.x = -Math.PI / 2;
-floor.position.set(0, 0, -2.5);
+floor.position.set(0, 0, 0);
 scene.add(floor);
 
-var grid = new THREE.GridHelper(34, 34, 0x44492e, 0x2a2e1f);
-grid.position.set(0, 0.01, -2.5);
+var grid = new THREE.GridHelper(40, 40, 0x44492e, 0x2a2e1f);
+grid.position.set(0, 0.01, 0);
 scene.add(grid);
 
 var extractionRing = new THREE.Mesh(
@@ -395,32 +395,54 @@ function buildBreachDoor(x, z, wz, wx, h, label) {
   return doorObj;
 }
 
-// perimeter, corridor walls (with doorway gaps) and room separators
+// hotel floor plan inspired by tactical operation blueprints: public rooms,
+// back-of-house service spaces, and several breachable choke points.
+var mapBounds = { minX: -18, maxX: 18, minZ: -16, maxZ: 16 };
+var roomLabels = [
+  { name: 'FOYER', x: -5.1, z: -4.5 }, { name: 'CAFE', x: 1.9, z: -9.8 },
+  { name: 'KITCHEN', x: 10.6, z: -10.2 }, { name: 'OFFICE 1', x: 11.3, z: -3.4 },
+  { name: 'OFFICE 2', x: 11.5, z: 0.5 }, { name: 'SECURITY\nOFFICE', x: 14.3, z: -0.3 },
+  { name: 'RECEPTION', x: 1.5, z: -2.5 }, { name: 'MAIN HALL', x: -4.6, z: 3.1 },
+  { name: "RICKY'S\nBAR", x: -11.4, z: 1.6 }, { name: 'ATRIUM', x: 9.2, z: 3.1 },
+  { name: 'GIFT SHOP', x: 1.4, z: 6.2 }, { name: 'TELEPHONE\nROOM', x: 0.3, z: 10.6 },
+  { name: 'WORKOUT\nROOM', x: -10.5, z: 10.3 }, { name: 'STORAGE', x: -11.3, z: 13.3 },
+  { name: 'PANTRY', x: -16.2, z: 13.3 }, { name: 'W/C', x: -14.7, z: -0.5 },
+  { name: 'GUEST\nLAUNDRY', x: -11.7, z: -2.2 }, { name: 'PANTRY\nCORRIDOR', x: -16.5, z: 5.1 }
+];
+var hatchZones = [
+  { x: -15.5, z: -11.4, w: 5, d: 5.2 }, { x: -15.3, z: -6.8, w: 3.2, d: 2.4 },
+  { x: 15.4, z: -8.7, w: 5.2, d: 7.4 }, { x: 16, z: -2.8, w: 3.6, d: 3.4 },
+  { x: 13.3, z: 13.0, w: 9.5, d: 5.4 }, { x: 2.5, z: 14.0, w: 10.5, d: 4.0 },
+  { x: 7.6, z: 9.8, w: 4.8, d: 3.8 }
+];
+var furnitureDefs = [
+  [-7.0,-5.2,0.35,1.2],[-6.9,-3.8,0.35,1.2],[-6.9,-2.4,0.35,1.2],[-2.6,-2.8,1.2,0.28],
+  [0.0,-2.9,1.2,0.28],[2.2,-2.9,1.2,0.28],[4.1,-2.5,0.3,3.6],[1.2,-0.3,1.2,0.28],
+  [-12.8,0.4,0.75,0.75],[-10.0,0.4,0.75,0.75],[-12.8,1.9,0.75,0.75],[-10.0,1.9,0.75,0.75],[-11.4,3.2,0.75,0.75],[-12.8,4.4,0.75,0.75],[-10.0,4.4,0.75,0.75],
+  [7.4,3.2,1.6,0.45],[10.2,3.8,1.0,0.8],[11.8,1.8,1.0,0.8],[14.6,3.5,0.4,1.8],
+  [0.7,-11.6,0.75,0.75],[3.0,-11.6,0.75,0.75],[5.3,-11.6,0.75,0.75],[2.1,-9.7,0.75,0.75],[4.4,-9.7,0.75,0.75],
+  [11.6,-8.0,0.35,1.0],[11.6,-5.6,0.35,1.0],[14.3,-3.3,0.35,1.4]
+];
 var wallDefs = [
-  // west corridor wall pieces (gaps at z=3 Living, z=-3 Office[breach], z=-9 Storage[breach])
-  [-1.6, 4.9, 0.4, 2.2], [-1.6, 0, 0.4, 4.4], [-1.6, -6, 0.4, 4.4], [-1.6, -10.9, 0.4, 2.2],
-  // east corridor wall pieces (gaps at z=3 Kitchen, z=-3 Bedroom, z=-9 Master Bedroom)
-  [1.6, 4.9, 0.4, 2.2], [1.6, 0, 0.4, 4.4], [1.6, -6, 0.4, 4.4], [1.6, -10.9, 0.4, 2.2],
-  // room separators
-  [-5.6, 0, 8, 0.4], [-5.6, -6, 8, 0.4], [5.6, 0, 8, 0.4], [5.6, -6, 8, 0.4],
-  // perimeter
-  [0, -12, 19.2, 0.4], [-5.6, 6, 8, 0.4], [5.6, 6, 8, 0.4],
-  [-9.6, -3, 0.4, 18], [9.6, -3, 0.4, 18]
+  [-17, -8, 0.35, 8], [-17, 4, 0.35, 8], [-17, 12, 0.35, 8],
+  [17, -8, 0.35, 8], [17, 1, 0.35, 6], [17, 9, 0.35, 8],
+  [-5, -12, 9, 0.35], [3, -12, 10, 0.35], [12, -12, 10, 0.35],
+  [-7, 16, 20, 0.35], [9, 16, 16, 0.35],
+  [-5, -7, 0.35, 9], [5, -7, 0.35, 9], [-1, -12, 0.35, 3], [8.5, -12, 0.35, 5], [12.5, -9.5, 0.35, 5],
+  [-12, -4, 10, 0.35], [-8, -1, 0.35, 6], [-14, -1, 0.35, 3], [-15.5, 1, 3, 0.35],
+  [-5, 0, 0.35, 8], [5, -1, 0.35, 7], [0, -5.5, 10, 0.35], [0, 0.8, 10, 0.35],
+  [10, -5.5, 10, 0.35], [8.5, -2.5, 0.35, 6], [13, -2, 0.35, 7], [15, 1.5, 4, 0.35], [11, 1.5, 4, 0.35],
+  [-11, 6, 12, 0.35], [-14.5, 8.5, 0.35, 5], [-9, 8.5, 0.35, 5], [-12, 11, 6, 0.35], [-12, 16, 0.35, 10],
+  [-2, 6, 6, 0.35], [5, 6, 0.35, 7], [0, 8.2, 10, 0.35], [-2, 11, 0.35, 5], [5, 11, 0.35, 5],
+  [9, 6, 8, 0.35], [13, 6, 0.35, 8], [9, 10, 8, 0.35]
 ];
 wallDefs.forEach(function (w) { buildWall(w[0], w[1], w[2], w[3]); });
 
-var officeDoor = buildBreachDoor(-1.6, -3, 1.6, 0.4, 2.6, 'OFFICE');
-var storageDoor = buildBreachDoor(-1.6, -9, 1.6, 0.4, 2.6, 'STORAGE');
+var officeDoor = buildBreachDoor(8.5, -0.5, 1.6, 0.4, 2.6, 'OFFICE 2');
+var storageDoor = buildBreachDoor(-5, 2.2, 1.6, 0.4, 2.6, 'MAIN HALL');
 
-var propDefs = [
-  [-6.5, 2, 1, 1], [-4, 4.5, 1.2, 0.8],
-  [6, 1, 1.4, 0.8],
-  [-7, -1.3, 1.4, 0.8],
-  [4.5, -1.5, 1, 1], [7.5, -4.4, 1.2, 1],
-  [-7, -10.4, 1.3, 1], [-4, -7.4, 1, 1.2],
-  [7, -7.8, 1, 1]
-];
-propDefs.forEach(function (p) { buildProp(p[0], p[1], p[2], p[3]); });
+var propDefs = furnitureDefs.filter(function (_, i) { return i % 2 === 0; });
+propDefs.forEach(function (p) { buildProp(p[0], p[1], p[2], p[3], 0.75, 0x4d4436); });
 
 /* =====================================================================
    CHARACTER MODELS
@@ -457,7 +479,7 @@ function makeHumanoid(color, opts) {
    ENTITIES
    ===================================================================== */
 var player = {
-  pos: new THREE.Vector3(0, 0, 8),
+  pos: new THREE.Vector3(0, 0, 13.4),
   yaw: 0, pitch: 0,
   hp: 100, maxHp: 100,
   ammoMag: 15, magSize: 15, ammoReserve: 45,
@@ -478,8 +500,8 @@ function makeTeammate(name, x, z, slotSign) {
   };
 }
 var teammates = [
-  makeTeammate('ALPHA-2', -1, 8.6, -1),
-  makeTeammate('ALPHA-3', 1, 8.6, 1)
+  makeTeammate('ALPHA-2', -1, 14.1, -1),
+  makeTeammate('ALPHA-3', 1, 14.1, 1)
 ];
 teammates.forEach(function (t) { t.mesh.userData.entity = t; });
 
@@ -497,10 +519,10 @@ function makeEnemy(x, z, room) {
   return e;
 }
 var enemies = [
-  makeEnemy(6.5, 2, 'Kitchen'),
-  makeEnemy(4.5, -4, 'Bedroom'),
-  makeEnemy(-6.5, -8, 'Storage'),
-  makeEnemy(-4.5, -10.5, 'Storage')
+  makeEnemy(10.8, -9.5, 'Kitchen'),
+  makeEnemy(3.0, -9.5, 'Cafe'),
+  makeEnemy(-11.5, 2.0, "Ricky's Bar"),
+  makeEnemy(11.5, -0.6, 'Office 2')
 ];
 
 function makeCivilian(x, z, isHostage, room) {
@@ -516,10 +538,10 @@ function makeCivilian(x, z, isHostage, room) {
   return c;
 }
 var civilians = [
-  makeCivilian(-6, 4, false, 'Living Room'),
-  makeCivilian(-4, 2, false, 'Living Room'),
-  makeCivilian(-7, -4, true, 'Office'),
-  makeCivilian(7, -10, true, 'Master Bedroom')
+  makeCivilian(-5.8, -3.0, false, 'Foyer'),
+  makeCivilian(8.8, 3.6, false, 'Atrium'),
+  makeCivilian(14.4, -0.3, true, 'Security Office'),
+  makeCivilian(1.5, 6.0, true, 'Gift Shop')
 ];
 var hostages = civilians.filter(function (c) { return c.isHostage; });
 
@@ -1091,37 +1113,69 @@ function drawMinimap(canvasEl, size) {
   if (!canvasEl) return;
   if (canvasEl.width !== size) { canvasEl.width = size; canvasEl.height = size; }
   var ctx = canvasEl.getContext('2d');
-  ctx.fillStyle = '#0d100b';
+  ctx.fillStyle = '#020302';
   ctx.fillRect(0, 0, size, size);
-  var scale = size / 24;
-  function toX(x) { return size / 2 + x * scale; }
-  function toY(z) { return size / 2 + z * scale; }
 
-  ctx.strokeStyle = 'rgba(140,150,120,0.5)';
-  ctx.lineWidth = 2;
-  colliders.forEach(function (w) {
-    if (w.isDoor && w.opened) return;
-    ctx.strokeRect(toX(w.x - w.w / 2), toY(w.z - w.d / 2), w.w * scale, w.d * scale);
+  var pad = size * 0.035;
+  var sx = (size - pad * 2) / (mapBounds.maxX - mapBounds.minX);
+  var sy = (size - pad * 2) / (mapBounds.maxZ - mapBounds.minZ);
+  function toX(x) { return pad + (x - mapBounds.minX) * sx; }
+  function toY(z) { return pad + (z - mapBounds.minZ) * sy; }
+  function drawRectOutline(x, z, w, d, color, lw) {
+    ctx.strokeStyle = color || '#f2f2ec';
+    ctx.lineWidth = lw || Math.max(1.25, size / 135);
+    ctx.strokeRect(toX(x - w / 2), toY(z - d / 2), w * sx, d * sy);
+  }
+  function drawHatch(zone) {
+    var x = toX(zone.x - zone.w / 2), y = toY(zone.z - zone.d / 2), w = zone.w * sx, h = zone.d * sy;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+    ctx.strokeStyle = '#f2f2ec'; ctx.lineWidth = Math.max(1, size / 190);
+    for (var i = -h; i < w + h; i += Math.max(5, size / 35)) {
+      ctx.beginPath(); ctx.moveTo(x + i, y); ctx.lineTo(x + i + h, y + h); ctx.stroke();
+    }
+    ctx.restore();
+    drawRectOutline(zone.x, zone.z, zone.w, zone.d, '#f2f2ec', Math.max(1, size / 160));
+  }
+
+  hatchZones.forEach(drawHatch);
+  ctx.strokeStyle = '#f2f2ec';
+  ctx.lineCap = 'square';
+  wallDefs.forEach(function (w) { drawRectOutline(w[0], w[1], w[2], w[3], '#f2f2ec', Math.max(1.2, size / 120)); });
+  breachDoors.forEach(function (door) {
+    if (door.opened) return;
+    drawRectOutline(door.x, door.z, door.collider.w, door.collider.d, '#f2f2ec', Math.max(1.2, size / 110));
   });
+
+  ctx.strokeStyle = '#f2f2ec'; ctx.lineWidth = Math.max(0.8, size / 240);
+  furnitureDefs.forEach(function (f) { ctx.strokeRect(toX(f[0] - f[2] / 2), toY(f[1] - f[3] / 2), f[2] * sx, f[3] * sy); });
+
+  if (size > 190) {
+    ctx.fillStyle = '#f2f2ec';
+    ctx.font = Math.max(8, Math.floor(size / 24)) + 'px Share Tech Mono, monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    roomLabels.forEach(function (r) {
+      var lines = r.name.split('\n');
+      lines.forEach(function (line, idx) { ctx.fillText(line, toX(r.x), toY(r.z) + (idx - (lines.length - 1) / 2) * (size / 24)); });
+    });
+  }
 
   ctx.fillStyle = '#5d9bd9';
   teammates.forEach(function (tm) {
-    if (tm.hp > 0) { ctx.beginPath(); ctx.arc(toX(tm.pos.x), toY(tm.pos.z), 4, 0, Math.PI * 2); ctx.fill(); }
+    if (tm.hp > 0) { ctx.beginPath(); ctx.arc(toX(tm.pos.x), toY(tm.pos.z), Math.max(2.5, size / 60), 0, Math.PI * 2); ctx.fill(); }
   });
-
   ctx.fillStyle = '#e05a4a';
   enemies.forEach(function (en) {
     if (!en.dead && !en.arrested && (en.state === 'combat' || en.state === 'alert')) {
-      ctx.beginPath(); ctx.arc(toX(en.pos.x), toY(en.pos.z), 4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(toX(en.pos.x), toY(en.pos.z), Math.max(2.5, size / 60), 0, Math.PI * 2); ctx.fill();
     }
   });
-
   ctx.save();
   ctx.translate(toX(player.pos.x), toY(player.pos.z));
   ctx.rotate(Math.atan2(playerFwd.x, playerFwd.z));
   ctx.fillStyle = '#e8c84a';
   ctx.beginPath();
-  ctx.moveTo(0, -7); ctx.lineTo(5, 6); ctx.lineTo(-5, 6); ctx.closePath();
+  ctx.moveTo(0, -Math.max(5, size / 28)); ctx.lineTo(Math.max(4, size / 42), Math.max(4, size / 34)); ctx.lineTo(-Math.max(4, size / 42), Math.max(4, size / 34)); ctx.closePath();
   ctx.fill();
   ctx.restore();
 }
