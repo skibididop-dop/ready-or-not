@@ -1,0 +1,1339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>BREACH PROTOCOL</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+:root{
+  --bg:#0b0d09;
+  --panel:rgba(16,19,13,0.92);
+  --border:#3a4030;
+  --accent:#c98f2e;
+  --accent2:#5d8a3a;
+  --danger:#c0392b;
+  --text:#d8d6c4;
+  --text-dim:#8a8d7a;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#000;
+  font-family:'Share Tech Mono','Consolas','Courier New',monospace;color:var(--text);}
+#viewport{position:fixed;inset:0;}
+#viewport canvas{display:block;}
+
+/* ---------- generic toggles ---------- */
+.toast-ui{position:fixed;opacity:0;pointer-events:none;transition:opacity .15s ease;}
+.toast-ui.show{opacity:1;}
+.overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+  background:rgba(4,5,3,0.82);z-index:50;flex-direction:column;text-align:center;cursor:pointer;}
+.overlay.show{display:flex;}
+
+/* ---------- start / pause screens ---------- */
+.panel{background:var(--panel);border:1px solid var(--border);padding:34px 42px;max-width:560px;cursor:default;}
+.panel h1{margin:0 0 4px 0;font-size:30px;letter-spacing:4px;color:var(--accent);text-shadow:0 0 12px rgba(201,143,46,0.5);}
+.panel h2{margin:0 0 18px 0;font-size:13px;letter-spacing:2px;color:var(--text-dim);font-weight:normal;}
+.panel p{font-size:13px;line-height:1.6;color:var(--text);text-align:left;}
+.controls-grid{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;text-align:left;
+  font-size:12px;margin:16px 0;color:var(--text-dim);}
+.controls-grid b{color:var(--accent2);}
+.start-btn{margin-top:14px;display:inline-block;padding:11px 26px;border:1px solid var(--accent);
+  color:var(--accent);letter-spacing:3px;font-size:13px;cursor:pointer;}
+.note{margin-top:14px;font-size:11px;color:var(--text-dim);border-top:1px solid var(--border);padding-top:10px;text-align:left;}
+
+/* ---------- HUD ---------- */
+#hud{position:fixed;inset:0;pointer-events:none;font-size:13px;z-index:10;}
+
+#crosshair{position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;
+  mix-blend-mode:difference;}
+#crosshair::before,#crosshair::after{content:'';position:absolute;background:#fff;}
+#crosshair::before{left:8px;top:0;width:2px;height:18px;}
+#crosshair::after{left:0;top:8px;width:18px;height:2px;}
+#crosshair.interact::before,#crosshair.interact::after{background:#5d8a3a;}
+#crosshair.hostile::before,#crosshair.hostile::after{background:#c0392b;}
+
+#healthWrap{position:absolute;left:22px;bottom:22px;width:220px;}
+#healthLabel{font-size:11px;color:var(--text-dim);letter-spacing:2px;margin-bottom:4px;}
+#healthBar{width:100%;height:14px;background:rgba(0,0,0,0.5);border:1px solid var(--border);}
+#healthFill{height:100%;width:100%;background:var(--accent2);transition:width .15s;}
+
+#ammoWrap{position:absolute;right:22px;bottom:22px;text-align:right;}
+#ammoText{font-size:26px;color:var(--accent);letter-spacing:1px;}
+#ammoLabel{font-size:11px;color:var(--text-dim);letter-spacing:2px;}
+
+#objectivesPanel{position:absolute;left:22px;top:20px;font-size:12px;letter-spacing:1px;}
+#objectivesPanel ul{list-style:none;margin:6px 0 0 0;padding:0;}
+#objectivesPanel li{color:var(--text);padding:2px 0;}
+#objectivesPanel li::before{content:'○ ';color:var(--text-dim);}
+#objectivesPanel li.done{color:var(--text-dim);text-decoration:line-through;}
+#objectivesPanel li.done::before{content:'● ';color:var(--accent2);}
+#objectivesPanel li.dim{color:var(--text-dim);}
+
+#scorePanel{position:absolute;right:22px;top:20px;font-size:11px;color:var(--text-dim);letter-spacing:1px;text-align:right;}
+
+#teammatesPanel{position:absolute;left:22px;bottom:60px;font-size:11px;width:230px;}
+.tm-row{display:flex;align-items:center;gap:6px;margin-top:4px;color:var(--text-dim);}
+.tm-row span:first-child{width:74px;color:var(--text);}
+.tm-bar{flex:1;height:8px;background:rgba(0,0,0,0.5);border:1px solid var(--border);}
+.tm-fill{height:100%;background:#5d9bd9;}
+.tm-state{width:60px;text-align:right;}
+
+#interactPrompt{position:absolute;left:50%;bottom:18%;transform:translateX(-50%);
+  padding:6px 14px;border:1px solid var(--accent2);background:rgba(0,0,0,0.55);
+  letter-spacing:2px;font-size:13px;color:var(--accent2);white-space:nowrap;}
+
+#chargeBarWrap{position:absolute;left:50%;bottom:23%;transform:translateX(-50%);
+  width:220px;text-align:center;}
+#chargeLabel{font-size:11px;color:var(--danger);letter-spacing:2px;margin-bottom:3px;}
+#chargeBar{width:100%;height:8px;background:rgba(0,0,0,0.5);border:1px solid var(--danger);}
+#chargeFill{height:100%;width:0%;background:var(--danger);}
+
+#hitmarker{position:absolute;left:50%;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;}
+#hitmarker::before,#hitmarker::after{content:'';position:absolute;width:100%;height:2px;background:#e8c84a;top:50%;}
+#hitmarker::before{transform:rotate(45deg);}
+#hitmarker::after{transform:rotate(-45deg);}
+
+#damageFlash{position:absolute;inset:0;
+  background:radial-gradient(ellipse at center, rgba(192,57,43,0) 40%, rgba(192,57,43,0.45) 100%);}
+
+#warningToast{position:absolute;left:50%;top:14%;transform:translateX(-50%);
+  padding:6px 16px;background:rgba(0,0,0,0.6);border:1px solid var(--accent);
+  color:var(--accent);letter-spacing:2px;font-size:12px;white-space:nowrap;}
+
+#commandPanel{position:absolute;left:50%;bottom:36%;transform:translateX(-50%);
+  background:rgba(0,0,0,0.7);border:1px solid var(--border);padding:10px 16px;font-size:12px;}
+#commandPanel div{padding:2px 0;color:var(--text-dim);}
+#commandPanel b{color:var(--accent2);}
+
+#minimapWrap{position:absolute;right:22px;top:50px;width:170px;height:170px;
+  border:1px solid var(--border);background:rgba(0,0,0,0.4);}
+#minimapWrap canvas{width:100%;height:100%;display:block;}
+
+/* ---------- tablet overlay ---------- */
+#tablet{position:fixed;inset:0;display:none;z-index:40;background:rgba(4,6,3,0.92);
+  align-items:center;justify-content:center;}
+#tablet.show{display:flex;}
+.tablet-inner{background:var(--panel);border:1px solid var(--border);padding:30px 40px;
+  width:640px;max-width:90vw;}
+.tablet-inner h2{margin:0;letter-spacing:3px;color:var(--accent);font-size:20px;}
+.tablet-inner h3{margin:18px 0 6px 0;letter-spacing:2px;font-size:12px;color:var(--text-dim);}
+.tablet-body{display:flex;gap:24px;margin-top:10px;}
+.tablet-objectives{flex:1;font-size:13px;}
+.tablet-objectives ul{list-style:none;margin:4px 0;padding:0;}
+.tablet-objectives li{padding:3px 0;}
+.tablet-objectives li::before{content:'○ ';color:var(--text-dim);}
+.tablet-objectives li.done{color:var(--text-dim);text-decoration:line-through;}
+.tablet-objectives li.done::before{content:'● ';color:var(--accent2);}
+.tablet-objectives li.dim{color:var(--text-dim);}
+#tabletMinimap{border:1px solid var(--border);background:rgba(0,0,0,0.4);width:240px;height:240px;}
+.tablet-foot{margin-top:18px;font-size:11px;color:var(--text-dim);border-top:1px solid var(--border);padding-top:10px;}
+
+/* ---------- end screen ---------- */
+#endScreen{z-index:60;}
+#endScreen .panel{width:420px;}
+#endTitle{font-size:26px;letter-spacing:4px;color:var(--accent);margin-bottom:2px;}
+#endRank{font-size:13px;color:var(--text-dim);letter-spacing:2px;margin-bottom:14px;}
+#endStats{font-size:13px;line-height:1.9;text-align:left;color:var(--text);}
+#restartBtn{margin-top:18px;display:inline-block;padding:10px 24px;border:1px solid var(--accent);
+  color:var(--accent);letter-spacing:3px;font-size:13px;cursor:pointer;}
+</style>
+</head>
+<body>
+
+<div id="viewport"></div>
+
+<!-- start screen -->
+<div id="blocker" class="overlay show">
+  <div class="panel">
+    <h1>BREACH PROTOCOL</h1>
+    <h2>OPERATION NIGHTFALL — TACTICAL RESPONSE PROTOTYPE</h2>
+    <p>A barricaded crew is holed up in a residential compound with hostages inside.
+    Breach, clear and bring everyone out alive. Arrests are worth more than kills —
+    control the scene, don't just win the firefight.</p>
+    <div class="controls-grid">
+      <b>WASD</b><span>Move</span>
+      <b>Mouse</b><span>Look</span>
+      <b>Shift</b><span>Sprint (louder)</span>
+      <b>Ctrl</b><span>Crouch (quiet)</span>
+      <b>LMB</b><span>Fire</span>
+      <b>R</b><span>Reload</span>
+      <b>E</b><span>Rescue / Order hands up / Arrest / Extract</span>
+      <b>F (hold)</b><span>Place breach charge on a marked door</span>
+      <b>1 / 2 / 3</b><span>Squad: Regroup / Hold / Breach marked door</span>
+      <b>Q</b><span>Show command list</span>
+      <b>L</b><span>Flashlight</span>
+      <b>Tab</b><span>Mission tablet</span>
+    </div>
+    <div class="start-btn">CLICK TO DEPLOY</div>
+    <div class="note">Single-player browser prototype. Demonstrates the design doc's core
+    systems (tactical movement, AI squad commands, breaching, hostage/suspect behaviour,
+    one-shot-lethal ballistics-lite) locally — no networking/server in this build.</div>
+  </div>
+</div>
+
+<div id="pausedOverlay" class="overlay">
+  <div class="panel"><h1 style="font-size:20px;">PAUSED</h1><h2>CLICK TO RESUME</h2></div>
+</div>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="crosshair"></div>
+
+  <div id="healthWrap">
+    <div id="healthLabel">ARMOR / HP</div>
+    <div id="healthBar"><div id="healthFill"></div></div>
+  </div>
+
+  <div id="ammoWrap">
+    <div id="ammoText">15 / 45</div>
+    <div id="ammoLabel">AMMO</div>
+  </div>
+
+  <div id="objectivesPanel">
+    <div style="color:var(--accent);letter-spacing:2px;">OBJECTIVES</div>
+    <ul id="objectivesList"></ul>
+  </div>
+
+  <div id="scorePanel"></div>
+
+  <div id="teammatesPanel"></div>
+
+  <div id="interactPrompt" class="toast-ui"></div>
+  <div id="chargeBarWrap" class="toast-ui">
+    <div id="chargeLabel">PLACING CHARGE</div>
+    <div id="chargeBar"><div id="chargeFill"></div></div>
+  </div>
+
+  <div id="hitmarker" class="toast-ui"></div>
+  <div id="damageFlash" class="toast-ui"></div>
+  <div id="warningToast" class="toast-ui"></div>
+
+  <div id="commandPanel" class="toast-ui">
+    <div><b>1</b> Regroup on me</div>
+    <div><b>2</b> Hold position</div>
+    <div><b>3</b> Breach nearest marked door</div>
+  </div>
+
+  <div id="minimapWrap"><canvas id="hudMinimap"></canvas></div>
+</div>
+
+<!-- mission tablet -->
+<div id="tablet">
+  <div class="tablet-inner">
+    <h2>MISSION TABLET</h2>
+    <h3>CASE 07 — OPERATION NIGHTFALL</h3>
+    <div class="tablet-body">
+      <div class="tablet-objectives">
+        <ul id="tabletObjectives"></ul>
+      </div>
+      <canvas id="tabletMinimap"></canvas>
+    </div>
+    <div class="tablet-foot">[TAB] or [ESC] to close and return to the operation.</div>
+  </div>
+</div>
+
+<!-- end screen -->
+<div id="endScreen" class="overlay">
+  <div class="panel">
+    <div id="endTitle">MISSION COMPLETE</div>
+    <div id="endRank"></div>
+    <div id="endStats"></div>
+    <div id="restartBtn">RETRY</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* =====================================================================
+   CONSTANTS
+   ===================================================================== */
+var WALK_SPEED = 3.0, SPRINT_SPEED = 5.4, CROUCH_SPEED = 1.6, RUN_SPEED = 3.6;
+var PLAYER_RADIUS = 0.35, EYE_HEIGHT = 1.7, CROUCH_EYE = 1.15;
+var SENS = 0.0022;
+var CHARGE_TIME = 2.0, RELOAD_TIME = 1.4;
+var EXTRACTION_POINT = { x: 0, z: 7.5 };
+
+/* =====================================================================
+   UTILITIES
+   ===================================================================== */
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+function rand(min, max) { return min + Math.random() * (max - min); }
+function dist2D(ax, az, bx, bz) { var dx = ax - bx, dz = az - bz; return Math.sqrt(dx * dx + dz * dz); }
+
+/* =====================================================================
+   THREE.JS SETUP
+   ===================================================================== */
+var scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05060a);
+scene.fog = new THREE.Fog(0x05060a, 12, 42);
+
+var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.rotation.order = 'YXZ';
+
+var renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.getElementById('viewport').appendChild(renderer.domElement);
+
+window.addEventListener('resize', function () {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+var ambient = new THREE.AmbientLight(0x3a4252, 0.32);
+scene.add(ambient);
+var moon = new THREE.DirectionalLight(0x8fa3c9, 0.22);
+moon.position.set(10, 20, 5);
+scene.add(moon);
+
+var flashlight = new THREE.SpotLight(0xfff3d6, 1.5, 16, Math.PI / 7, 0.4, 1.3);
+scene.add(flashlight);
+scene.add(flashlight.target);
+
+[[0, 4.9], [0, -1], [0, -7], [0, -10.9]].forEach(function (p) {
+  var pl = new THREE.PointLight(0xffd9a0, 0.85, 7, 2);
+  pl.position.set(p[0], 2.6, p[1]);
+  scene.add(pl);
+});
+
+var floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(34, 30),
+  new THREE.MeshStandardMaterial({ color: 0x23261d, roughness: 0.95 })
+);
+floor.rotation.x = -Math.PI / 2;
+floor.position.set(0, 0, -2.5);
+scene.add(floor);
+
+var grid = new THREE.GridHelper(34, 34, 0x44492e, 0x2a2e1f);
+grid.position.set(0, 0.01, -2.5);
+scene.add(grid);
+
+var extractionRing = new THREE.Mesh(
+  new THREE.RingGeometry(1.5, 2.0, 32),
+  new THREE.MeshBasicMaterial({ color: 0x4fd1c5, side: THREE.DoubleSide, transparent: true, opacity: 0.85 })
+);
+extractionRing.rotation.x = -Math.PI / 2;
+extractionRing.position.set(EXTRACTION_POINT.x, 0.05, EXTRACTION_POINT.z);
+extractionRing.visible = false;
+scene.add(extractionRing);
+
+/* =====================================================================
+   LEVEL: colliders + wall/door meshes
+   ===================================================================== */
+var colliders = [];
+var wallMeshes = [];
+var breachDoors = [];
+var noiseEvents = [];
+
+function addCollider(x, z, w, d, extra) {
+  var c = Object.assign({ x: x, z: z, w: w, d: d, opened: false }, extra || {});
+  colliders.push(c);
+  return c;
+}
+
+function collidesCircle(x, z, r) {
+  for (var i = 0; i < colliders.length; i++) {
+    var c = colliders[i];
+    if (c.isDoor && c.opened) continue;
+    var hw = c.w / 2, hd = c.d / 2;
+    var cx = clamp(x, c.x - hw, c.x + hw);
+    var cz = clamp(z, c.z - hd, c.z + hd);
+    var dx = x - cx, dz = z - cz;
+    if (dx * dx + dz * dz < r * r) return true;
+  }
+  return false;
+}
+
+function moveWithCollision(pos, dx, dz, r) {
+  if (!collidesCircle(pos.x + dx, pos.z, r)) pos.x += dx;
+  if (!collidesCircle(pos.x, pos.z + dz, r)) pos.z += dz;
+}
+
+function buildWall(x, z, w, d, h, color) {
+  h = h || 3; color = color || 0x6b6f63;
+  addCollider(x, z, w, d);
+  var mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshStandardMaterial({ color: color, roughness: 0.88, metalness: 0.04 })
+  );
+  mesh.position.set(x, h / 2, z);
+  scene.add(mesh);
+  wallMeshes.push(mesh);
+}
+
+function buildProp(x, z, w, d, h, color) {
+  h = h || 0.9; color = color || 0x5a4a35;
+  addCollider(x, z, w, d);
+  var mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshStandardMaterial({ color: color, roughness: 0.9 })
+  );
+  mesh.position.set(x, h / 2, z);
+  scene.add(mesh);
+  wallMeshes.push(mesh);
+}
+
+function buildBreachDoor(x, z, wz, wx, h, label) {
+  var collider = addCollider(x, z, wx, wz, { isDoor: true });
+  var pivot = new THREE.Group();
+  pivot.position.set(x, 0, z - wz / 2);
+  scene.add(pivot);
+  var panel = new THREE.Mesh(
+    new THREE.BoxGeometry(wx, h, wz),
+    new THREE.MeshStandardMaterial({ color: 0x7a3a2a, roughness: 0.7 })
+  );
+  panel.position.set(0, h / 2, wz / 2);
+  pivot.add(panel);
+  wallMeshes.push(panel);
+  var doorObj = { collider: collider, pivot: pivot, opened: false, x: x, z: z, label: label, targetRot: 0 };
+  breachDoors.push(doorObj);
+  return doorObj;
+}
+
+// perimeter, corridor walls (with doorway gaps) and room separators
+var wallDefs = [
+  // west corridor wall pieces (gaps at z=3 Living, z=-3 Office[breach], z=-9 Storage[breach])
+  [-1.6, 4.9, 0.4, 2.2], [-1.6, 0, 0.4, 4.4], [-1.6, -6, 0.4, 4.4], [-1.6, -10.9, 0.4, 2.2],
+  // east corridor wall pieces (gaps at z=3 Kitchen, z=-3 Bedroom, z=-9 Master Bedroom)
+  [1.6, 4.9, 0.4, 2.2], [1.6, 0, 0.4, 4.4], [1.6, -6, 0.4, 4.4], [1.6, -10.9, 0.4, 2.2],
+  // room separators
+  [-5.6, 0, 8, 0.4], [-5.6, -6, 8, 0.4], [5.6, 0, 8, 0.4], [5.6, -6, 8, 0.4],
+  // perimeter
+  [0, -12, 19.2, 0.4], [-5.6, 6, 8, 0.4], [5.6, 6, 8, 0.4],
+  [-9.6, -3, 0.4, 18], [9.6, -3, 0.4, 18]
+];
+wallDefs.forEach(function (w) { buildWall(w[0], w[1], w[2], w[3]); });
+
+var officeDoor = buildBreachDoor(-1.6, -3, 1.6, 0.4, 2.6, 'OFFICE');
+var storageDoor = buildBreachDoor(-1.6, -9, 1.6, 0.4, 2.6, 'STORAGE');
+
+var propDefs = [
+  [-6.5, 2, 1, 1], [-4, 4.5, 1.2, 0.8],
+  [6, 1, 1.4, 0.8],
+  [-7, -1.3, 1.4, 0.8],
+  [4.5, -1.5, 1, 1], [7.5, -4.4, 1.2, 1],
+  [-7, -10.4, 1.3, 1], [-4, -7.4, 1, 1.2],
+  [7, -7.8, 1, 1]
+];
+propDefs.forEach(function (p) { buildProp(p[0], p[1], p[2], p[3]); });
+
+/* =====================================================================
+   CHARACTER MODELS
+   ===================================================================== */
+function makeHumanoid(color, opts) {
+  opts = opts || {};
+  var g = new THREE.Group();
+  var bodyH = opts.bodyHeight || 1.1;
+  var body = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.32, 0.36, bodyH, 8),
+    new THREE.MeshStandardMaterial({ color: color, roughness: 0.8 })
+  );
+  body.position.y = bodyH / 2 + 0.05;
+  g.add(body);
+  var head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.22, 12, 12),
+    new THREE.MeshStandardMaterial({ color: 0xd8b48c, roughness: 0.9 })
+  );
+  head.position.y = bodyH + 0.27;
+  g.add(head);
+  if (opts.armed) {
+    var gun = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.12, 0.55),
+      new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.5 })
+    );
+    gun.position.set(0.28, bodyH * 0.65, 0.25);
+    g.add(gun);
+  }
+  scene.add(g);
+  return g;
+}
+
+/* =====================================================================
+   ENTITIES
+   ===================================================================== */
+var player = {
+  pos: new THREE.Vector3(0, 0, 8),
+  yaw: 0, pitch: 0,
+  hp: 100, maxHp: 100,
+  ammoMag: 15, magSize: 15, ammoReserve: 45,
+  reloading: false, reloadTimer: 0,
+  crouch: false, sprint: false,
+  score: 0, arrests: 0, kills: 0, hostagesRescued: 0, civilianCasualties: 0,
+  alive: true
+};
+
+function makeTeammate(name, x, z, slotSign) {
+  return {
+    kind: 'teammate', name: name,
+    pos: new THREE.Vector3(x, 0, z), yaw: 0,
+    hp: 100, maxHp: 100,
+    state: 'follow', breachTarget: null, breachTimer: 0,
+    cooldown: 0, slotSign: slotSign,
+    mesh: makeHumanoid(0x3b6ea5, { bodyHeight: 1.1, armed: true })
+  };
+}
+var teammates = [
+  makeTeammate('ALPHA-2', -1, 8.6, -1),
+  makeTeammate('ALPHA-3', 1, 8.6, 1)
+];
+teammates.forEach(function (t) { t.mesh.userData.entity = t; });
+
+function makeEnemy(x, z, room) {
+  var e = {
+    kind: 'enemy', room: room,
+    pos: new THREE.Vector3(x, 0, z), yaw: rand(0, Math.PI * 2),
+    hp: 1, state: 'idle',
+    cooldown: 0, alertTimer: 0, stunTimer: 0,
+    investigateTarget: null, investigateTimer: 0,
+    surrendered: false, isFaking: false, arrested: false, dead: false,
+    mesh: makeHumanoid(0xa5453b, { bodyHeight: 1.1, armed: true })
+  };
+  e.mesh.userData.entity = e;
+  return e;
+}
+var enemies = [
+  makeEnemy(6.5, 2, 'Kitchen'),
+  makeEnemy(4.5, -4, 'Bedroom'),
+  makeEnemy(-6.5, -8, 'Storage'),
+  makeEnemy(-4.5, -10.5, 'Storage')
+];
+
+function makeCivilian(x, z, isHostage, room) {
+  var c = {
+    kind: 'civilian', room: room, isHostage: !!isHostage,
+    pos: new THREE.Vector3(x, 0, z), yaw: 0,
+    state: isHostage ? 'hostage' : 'idle',
+    rescued: false, downed: false,
+    fleeDir: { x: 0, z: 0 }, fleeTimer: 0,
+    mesh: makeHumanoid(isHostage ? 0xd9c98a : 0xb8a66b, { bodyHeight: isHostage ? 0.75 : 1.1, armed: false })
+  };
+  c.mesh.userData.entity = c;
+  return c;
+}
+var civilians = [
+  makeCivilian(-6, 4, false, 'Living Room'),
+  makeCivilian(-4, 2, false, 'Living Room'),
+  makeCivilian(-7, -4, true, 'Office'),
+  makeCivilian(7, -10, true, 'Master Bedroom')
+];
+var hostages = civilians.filter(function (c) { return c.isHostage; });
+
+/* =====================================================================
+   AI HELPERS
+   ===================================================================== */
+var losRay = new THREE.Raycaster();
+function canSeeTarget(e, targetPos, maxDist) {
+  var dx = targetPos.x - e.pos.x, dz = targetPos.z - e.pos.z;
+  var dist = Math.hypot(dx, dz);
+  if (dist < 0.05) return true;
+  if (dist > maxDist) return false;
+  var facingX = Math.sin(e.yaw), facingZ = Math.cos(e.yaw);
+  var dot = (facingX * dx + facingZ * dz) / dist;
+  if (dot < 0.35) return false;
+  var from = new THREE.Vector3(e.pos.x, 1.5, e.pos.z);
+  var to = new THREE.Vector3(targetPos.x, 1.5, targetPos.z);
+  var dir = to.clone().sub(from).normalize();
+  losRay.set(from, dir);
+  losRay.far = dist;
+  var hits = losRay.intersectObjects(wallMeshes, false);
+  return hits.length === 0;
+}
+
+function faceToward(e, targetPos, dt) {
+  var dx = targetPos.x - e.pos.x, dz = targetPos.z - e.pos.z;
+  var targetYaw = Math.atan2(dx, dz);
+  var diff = targetYaw - e.yaw;
+  while (diff > Math.PI) diff -= Math.PI * 2;
+  while (diff < -Math.PI) diff += Math.PI * 2;
+  var maxTurn = 6.0 * dt;
+  e.yaw += clamp(diff, -maxTurn, maxTurn);
+}
+
+function moveToward(e, targetPos, speed, dt, radius) {
+  faceToward(e, targetPos, dt);
+  var dx = targetPos.x - e.pos.x, dz = targetPos.z - e.pos.z;
+  var d = Math.hypot(dx, dz);
+  if (d < 0.15) return true;
+  moveWithCollision(e.pos, (dx / d) * speed * dt, (dz / d) * speed * dt, radius || 0.38);
+  return false;
+}
+
+function pushNoiseEvent(x, z, radius) {
+  noiseEvents.push({ x: x, z: z, radius: radius, time: performance.now() });
+}
+
+function fireWeapon(fromPos, toPos, baseAcc, onHit) {
+  var dist = dist2D(fromPos.x, fromPos.z, toPos.x, toPos.z);
+  var hitChance = clamp(baseAcc * (1 - dist / 20), 0.12, 0.92);
+  spawnMuzzleFlash(fromPos, false);
+  playGunshotSound(0.4);
+  pushNoiseEvent(fromPos.x, fromPos.z, 14);
+  if (Math.random() < hitChance) onHit();
+}
+
+function damagePlayer(amount) {
+  if (!player.alive) return;
+  player.hp -= amount;
+  flashDamage();
+  if (player.hp <= 0) { player.hp = 0; player.alive = false; missionFailed(); }
+}
+
+function damageTeammate(tm, amount) {
+  if (tm.hp <= 0) return;
+  tm.hp -= amount;
+  if (tm.hp <= 0) { tm.hp = 0; tm.state = 'down'; }
+}
+
+function updateMeshTransform(entity) {
+  entity.mesh.position.x = entity.pos.x;
+  entity.mesh.position.z = entity.pos.z;
+  entity.mesh.rotation.y = entity.yaw || 0;
+  entity.mesh.position.y = 0;
+  entity.mesh.rotation.x = 0;
+  entity.mesh.scale.y = 1;
+  if (entity.kind === 'enemy') {
+    if (entity.dead) { entity.mesh.rotation.x = Math.PI / 2; entity.mesh.position.y = 0.2; }
+    else if (entity.arrested || entity.surrendered) { entity.mesh.scale.y = 0.65; }
+  } else if (entity.kind === 'civilian' && entity.downed) {
+    entity.mesh.rotation.x = Math.PI / 2; entity.mesh.position.y = 0.2;
+  } else if (entity.kind === 'teammate' && entity.hp <= 0) {
+    entity.mesh.rotation.x = Math.PI / 2; entity.mesh.position.y = 0.2;
+  }
+}
+
+/* =====================================================================
+   ENEMY AI
+   ===================================================================== */
+function updateEnemy(e, dt) {
+  if (e.dead || e.arrested) { updateMeshTransform(e); return; }
+
+  if (e.state === 'surrendered') {
+    // stands still, waiting to be arrested
+  } else if (e.state === 'stunned') {
+    e.stunTimer -= dt;
+    if (e.stunTimer <= 0) { e.state = 'alert'; e.alertTimer = 0.3; }
+  } else if (e.state === 'idle') {
+    var spotted = false;
+    for (var i = 0; i < noiseEvents.length; i++) {
+      var n = noiseEvents[i];
+      if (performance.now() - n.time > 1500) continue;
+      if (dist2D(e.pos.x, e.pos.z, n.x, n.z) < n.radius) {
+        e.state = 'investigate'; e.investigateTarget = { x: n.x, z: n.z }; e.investigateTimer = 4;
+        spotted = true; break;
+      }
+    }
+    if (!spotted) {
+      if (player.alive && canSeeTarget(e, player.pos, 9)) { e.state = 'alert'; e.alertTimer = 0.4; }
+      else {
+        for (var j = 0; j < teammates.length; j++) {
+          var tm0 = teammates[j];
+          if (tm0.hp > 0 && canSeeTarget(e, tm0.pos, 9)) { e.state = 'alert'; e.alertTimer = 0.4; break; }
+        }
+      }
+    }
+  } else if (e.state === 'investigate') {
+    e.investigateTimer -= dt;
+    moveToward(e, e.investigateTarget, 1.6, dt);
+    if (player.alive && canSeeTarget(e, player.pos, 11)) { e.state = 'alert'; e.alertTimer = 0.4; }
+    if (e.investigateTimer <= 0) e.state = 'idle';
+  } else if (e.state === 'alert') {
+    if (player.alive) faceToward(e, player.pos, dt);
+    e.alertTimer -= dt;
+    if (e.alertTimer <= 0) e.state = 'combat';
+  } else if (e.state === 'combat') {
+    var targetRef = null, bestDist = Infinity;
+    if (player.alive) {
+      var dP = dist2D(e.pos.x, e.pos.z, player.pos.x, player.pos.z);
+      if (dP < 16 && canSeeTarget(e, player.pos, 16)) { targetRef = player; bestDist = dP; }
+    }
+    for (var k = 0; k < teammates.length; k++) {
+      var tm = teammates[k];
+      if (tm.hp <= 0) continue;
+      var dT = dist2D(e.pos.x, e.pos.z, tm.pos.x, tm.pos.z);
+      if (dT < 16 && dT < bestDist && canSeeTarget(e, tm.pos, 16)) { targetRef = tm; bestDist = dT; }
+    }
+    if (!targetRef) { e.state = 'idle'; }
+    else {
+      faceToward(e, targetRef.pos, dt);
+      e.cooldown -= dt;
+      if (e.cooldown <= 0) {
+        e.cooldown = rand(1.0, 1.6);
+        (function (tRef) {
+          fireWeapon(e.pos, tRef.pos, 0.5, function () {
+            if (tRef === player) damagePlayer(rand(10, 22));
+            else damageTeammate(tRef, rand(10, 22));
+          });
+        })(targetRef);
+      }
+    }
+  }
+  updateMeshTransform(e);
+}
+
+/* =====================================================================
+   TEAMMATE AI
+   ===================================================================== */
+var playerFwd = new THREE.Vector3(0, 0, -1);
+var playerRight = new THREE.Vector3(1, 0, 0);
+
+function updateTeammate(tm, dt) {
+  if (tm.hp <= 0) { updateMeshTransform(tm); return; }
+
+  var target = null, bestDist = Infinity;
+  for (var i = 0; i < enemies.length; i++) {
+    var en = enemies[i];
+    if (en.dead || en.arrested || en.surrendered) continue;
+    var d = dist2D(tm.pos.x, tm.pos.z, en.pos.x, en.pos.z);
+    if (d < 16 && d < bestDist && canSeeTarget(tm, en.pos, 16)) { target = en; bestDist = d; }
+  }
+
+  if (target) {
+    faceToward(tm, target.pos, dt);
+    tm.cooldown -= dt;
+    if (tm.cooldown <= 0) {
+      tm.cooldown = rand(0.7, 1.1);
+      (function (tgt) {
+        fireWeapon(tm.pos, tgt.pos, 0.75, function () {
+          if (!tgt.dead) { tgt.dead = true; tgt.state = 'dead'; }
+        });
+      })(target);
+    }
+  } else if (tm.state === 'breach') {
+    var door = tm.breachTarget;
+    if (!door || door.opened) { tm.state = 'follow'; tm.breachTarget = null; }
+    else {
+      var dist = dist2D(tm.pos.x, tm.pos.z, door.x, door.z);
+      if (dist > 1.4) { moveToward(tm, { x: door.x, z: door.z }, RUN_SPEED, dt); }
+      else {
+        faceToward(tm, { x: door.x, z: door.z }, dt);
+        tm.breachTimer += dt;
+        if (tm.breachTimer > 1.5) { detonateDoor(door); tm.state = 'follow'; tm.breachTarget = null; }
+      }
+    }
+  } else if (tm.state === 'hold') {
+    // stand ground
+  } else {
+    var desired = {
+      x: player.pos.x - playerFwd.x * 2.2 + playerRight.x * tm.slotSign * 1.5,
+      z: player.pos.z - playerFwd.z * 2.2 + playerRight.z * tm.slotSign * 1.5
+    };
+    var dToDesired = dist2D(tm.pos.x, tm.pos.z, desired.x, desired.z);
+    if (dToDesired > 0.7) moveToward(tm, desired, RUN_SPEED, dt);
+  }
+  updateMeshTransform(tm);
+}
+
+function commandFollow() {
+  teammates.forEach(function (t) { if (t.hp > 0) { t.state = 'follow'; t.breachTarget = null; } });
+  flashWarning('SQUAD REGROUPING');
+}
+function commandHold() {
+  teammates.forEach(function (t) { if (t.hp > 0 && t.state !== 'breach') t.state = 'hold'; });
+  flashWarning('SQUAD HOLDING POSITION');
+}
+function commandBreach() {
+  var doorTarget = breachDoors.filter(function (d) { return !d.opened; })[0];
+  if (!doorTarget) { flashWarning('NO MARKED DOORS REMAINING'); return; }
+  var tm = teammates.filter(function (t) { return t.hp > 0 && t.state !== 'breach'; })[0];
+  if (!tm) return;
+  tm.state = 'breach'; tm.breachTarget = doorTarget; tm.breachTimer = 0;
+  flashWarning(tm.name + ' MOVING TO BREACH ' + doorTarget.label);
+}
+
+/* =====================================================================
+   CIVILIAN AI
+   ===================================================================== */
+function updateCivilian(c, dt) {
+  if (c.downed || c.rescued || c.isHostage) { updateMeshTransform(c); return; }
+  if (c.state !== 'fleeing') {
+    for (var i = 0; i < noiseEvents.length; i++) {
+      var n = noiseEvents[i];
+      if (performance.now() - n.time > 1000) continue;
+      var d = dist2D(c.pos.x, c.pos.z, n.x, n.z);
+      if (d < n.radius * 1.2) {
+        c.state = 'fleeing';
+        var dx = c.pos.x - n.x, dz = c.pos.z - n.z;
+        var len = Math.hypot(dx, dz) || 1;
+        c.fleeDir = { x: dx / len, z: dz / len };
+        c.fleeTimer = 2.5;
+        break;
+      }
+    }
+  }
+  if (c.state === 'fleeing') {
+    c.fleeTimer -= dt;
+    moveWithCollision(c.pos, c.fleeDir.x * 1.8 * dt, c.fleeDir.z * 1.8 * dt, 0.35);
+    c.yaw = Math.atan2(c.fleeDir.x, c.fleeDir.z);
+    if (c.fleeTimer <= 0) c.state = 'idle';
+  }
+  updateMeshTransform(c);
+}
+
+/* =====================================================================
+   BREACHING
+   ===================================================================== */
+var chargeDoor = null, chargeProgress = 0;
+
+function findAimedBreachDoor() {
+  var best = null, bestD = Infinity;
+  for (var i = 0; i < breachDoors.length; i++) {
+    var dr = breachDoors[i];
+    if (dr.opened) continue;
+    var dx = dr.x - player.pos.x, dz = dr.z - player.pos.z;
+    var dist = Math.hypot(dx, dz);
+    if (dist > 2.8 || dist < 0.01) continue;
+    var dot = (playerFwd.x * dx + playerFwd.z * dz) / dist;
+    if (dot < 0.5) continue;
+    if (dist < bestD) { bestD = dist; best = dr; }
+  }
+  return best;
+}
+
+function detonateDoor(door) {
+  if (door.opened) return;
+  door.opened = true; door.collider.opened = true; door.targetRot = -2.0;
+  playBreachSound();
+  pushNoiseEvent(door.x, door.z, 20);
+  spawnExplosionFlash(door.x, door.z);
+  enemies.forEach(function (en) {
+    if (en.dead || en.arrested) return;
+    if (dist2D(en.pos.x, en.pos.z, door.x, door.z) < 6) { en.state = 'stunned'; en.stunTimer = 3.0; }
+  });
+}
+
+function updateBreach(dt) {
+  if (player.alive && keys['KeyF']) {
+    var aimed = findAimedBreachDoor();
+    if (aimed) {
+      if (chargeDoor !== aimed) { chargeDoor = aimed; chargeProgress = 0; }
+      chargeProgress += dt;
+      if (chargeProgress >= CHARGE_TIME) { detonateDoor(chargeDoor); chargeDoor = null; chargeProgress = 0; }
+    } else { chargeDoor = null; chargeProgress = 0; }
+  } else { chargeDoor = null; chargeProgress = 0; }
+}
+
+/* =====================================================================
+   PLAYER SHOOTING + INTERACTION
+   ===================================================================== */
+var shootRay = new THREE.Raycaster();
+var lastShotTime = 0;
+
+function playerShoot() {
+  if (!player.alive || gameState !== 'playing' || player.reloading) return;
+  var now = performance.now();
+  if (now - lastShotTime < 150) return;
+  if (player.ammoMag <= 0) { playEmptyClick(); return; }
+  lastShotTime = now;
+  player.ammoMag--;
+  spawnMuzzleFlash(camera.position, true);
+  playGunshotSound(0.8);
+  player.pitch -= 0.012;
+  pushNoiseEvent(player.pos.x, player.pos.z, 16);
+
+  shootRay.setFromCamera({ x: 0, y: 0 }, camera);
+  var targets = [];
+  enemies.forEach(function (en) { if (!en.dead && !en.arrested) targets.push(en.mesh); });
+  civilians.forEach(function (c) { if (!c.rescued && !c.downed) targets.push(c.mesh); });
+  teammates.forEach(function (tm) { if (tm.hp > 0) targets.push(tm.mesh); });
+
+  var wallHits = shootRay.intersectObjects(wallMeshes, false);
+  var wallDist = wallHits.length ? wallHits[0].distance : Infinity;
+  var charHits = shootRay.intersectObjects(targets, true);
+
+  if (charHits.length && charHits[0].distance < wallDist) {
+    var obj = charHits[0].object;
+    while (obj && !obj.userData.entity) obj = obj.parent;
+    var entity = obj ? obj.userData.entity : null;
+    if (entity) registerHit(entity);
+  } else if (wallHits.length) {
+    spawnImpactSpark(wallHits[0].point);
+  }
+}
+
+function registerHit(entity) {
+  showHitMarker();
+  if (entity.kind === 'enemy') {
+    if (entity.surrendered || entity.arrested || entity.dead) return;
+    entity.dead = true; entity.state = 'dead';
+    player.score += 25; player.kills++;
+    playDownedSound();
+    checkObjectives();
+  } else if (entity.kind === 'civilian') {
+    if (entity.rescued || entity.downed) return;
+    entity.downed = true;
+    player.score -= 200; player.civilianCasualties++;
+    flashWarning('CIVILIAN CASUALTY');
+  } else if (entity.kind === 'teammate') {
+    if (entity.hp <= 0) return;
+    damageTeammate(entity, rand(30, 55));
+    flashWarning('FRIENDLY FIRE');
+  }
+}
+
+function getInteractTarget() {
+  for (var i = 0; i < hostages.length; i++) {
+    var h = hostages[i];
+    if (h.rescued) continue;
+    if (dist2D(player.pos.x, player.pos.z, h.pos.x, h.pos.z) < 2.2) return { type: 'hostage', target: h };
+  }
+  for (var j = 0; j < enemies.length; j++) {
+    var en = enemies[j];
+    if (en.dead || en.arrested) continue;
+    if (en.surrendered && dist2D(player.pos.x, player.pos.z, en.pos.x, en.pos.z) < 2.2) {
+      return { type: 'arrest', target: en };
+    }
+  }
+  if (extractionReady && dist2D(player.pos.x, player.pos.z, EXTRACTION_POINT.x, EXTRACTION_POINT.z) < 2.5) {
+    return { type: 'extract', target: null };
+  }
+  shootRay.setFromCamera({ x: 0, y: 0 }, camera);
+  var compelTargets = enemies.filter(function (en) { return !en.dead && !en.arrested && !en.surrendered; }).map(function (en) { return en.mesh; });
+  var hits = shootRay.intersectObjects(compelTargets, true);
+  if (hits.length && hits[0].distance < 7) {
+    var obj = hits[0].object;
+    while (obj && !obj.userData.entity) obj = obj.parent;
+    if (obj) return { type: 'compel', target: obj.userData.entity };
+  }
+  return null;
+}
+
+function handleInteract(i) {
+  if (!i) return;
+  if (i.type === 'hostage') {
+    i.target.rescued = true;
+    player.score += 150; player.hostagesRescued++;
+    playRescueChime();
+    checkObjectives();
+  } else if (i.type === 'arrest') {
+    var en = i.target;
+    if (en.isFaking) {
+      damagePlayer(rand(15, 25));
+      en.dead = true; en.state = 'dead';
+      player.kills++;
+      flashWarning('SUSPECT ATTACKED — NEUTRALIZED');
+    } else {
+      en.arrested = true; en.state = 'arrested';
+      player.score += 100; player.arrests++;
+      playArrestSound();
+    }
+    checkObjectives();
+  } else if (i.type === 'compel') {
+    var e2 = i.target;
+    var chance = (e2.state === 'combat') ? 0.30 : 0.85;
+    if (Math.random() < chance) {
+      e2.surrendered = true; e2.state = 'surrendered';
+      e2.isFaking = Math.random() < 0.12;
+      flashWarning('SUSPECT SURRENDERED');
+    } else {
+      e2.state = 'combat'; e2.alertTimer = 0;
+      flashWarning('SUSPECT REFUSED — OPENING FIRE');
+    }
+  } else if (i.type === 'extract') {
+    missionComplete();
+  }
+}
+
+function checkObjectives() {
+  var suspectsDown = enemies.filter(function (e) { return e.dead || e.arrested; }).length;
+  var hostagesDone = hostages.filter(function (h) { return h.rescued; }).length;
+  if (suspectsDown === enemies.length && hostagesDone === hostages.length && !extractionReady) {
+    extractionReady = true;
+    flashWarning('ALL CLEAR — RETURN TO EXTRACTION');
+  }
+}
+
+/* =====================================================================
+   PLAYER MOVEMENT / RELOAD
+   ===================================================================== */
+var footstepTimer = 0;
+
+function startReload() {
+  if (player.reloading || player.ammoMag >= player.magSize || player.ammoReserve <= 0) return;
+  player.reloading = true; player.reloadTimer = RELOAD_TIME;
+}
+
+function handlePlayerMovement(dt) {
+  if (!player.alive) return;
+  player.sprint = !!(keys['ShiftLeft'] || keys['ShiftRight']);
+  player.crouch = !!(keys['ControlLeft'] || keys['ControlRight']);
+
+  var mx = 0, mz = 0;
+  if (keys['KeyW']) { mx += playerFwd.x; mz += playerFwd.z; }
+  if (keys['KeyS']) { mx -= playerFwd.x; mz -= playerFwd.z; }
+  if (keys['KeyD']) { mx += playerRight.x; mz += playerRight.z; }
+  if (keys['KeyA']) { mx -= playerRight.x; mz -= playerRight.z; }
+  var len = Math.hypot(mx, mz);
+  var moved = false;
+  if (len > 0.001) { mx /= len; mz /= len; moved = true; }
+
+  var speed = WALK_SPEED;
+  if (player.crouch) speed = CROUCH_SPEED;
+  else if (player.sprint) speed = SPRINT_SPEED;
+
+  moveWithCollision(player.pos, mx * speed * dt, mz * speed * dt, PLAYER_RADIUS);
+  player.pos.x = clamp(player.pos.x, -13, 13);
+  player.pos.z = clamp(player.pos.z, -14, 9);
+  camera.position.set(player.pos.x, player.crouch ? CROUCH_EYE : EYE_HEIGHT, player.pos.z);
+
+  if (moved) {
+    footstepTimer += dt;
+    var interval = player.sprint ? 0.32 : 0.5;
+    if (footstepTimer > interval) {
+      footstepTimer = 0;
+      if (player.sprint) pushNoiseEvent(player.pos.x, player.pos.z, 8);
+      else if (!player.crouch) pushNoiseEvent(player.pos.x, player.pos.z, 3.5);
+    }
+  }
+
+  if (player.reloading) {
+    player.reloadTimer -= dt;
+    if (player.reloadTimer <= 0) {
+      var need = player.magSize - player.ammoMag;
+      var take = Math.min(need, player.ammoReserve);
+      player.ammoMag += take; player.ammoReserve -= take;
+      player.reloading = false;
+    }
+  }
+}
+
+/* =====================================================================
+   VFX / SFX
+   ===================================================================== */
+function spawnMuzzleFlash(pos, isPlayer) {
+  var light = new THREE.PointLight(0xffd27a, isPlayer ? 3 : 2, isPlayer ? 4 : 3);
+  light.position.set(pos.x, pos.y || 1.4, pos.z);
+  scene.add(light);
+  setTimeout(function () { scene.remove(light); }, 60);
+}
+function spawnExplosionFlash(x, z) {
+  var light = new THREE.PointLight(0xfff2c0, 8, 14);
+  light.position.set(x, 1.2, z);
+  scene.add(light);
+  setTimeout(function () { scene.remove(light); }, 220);
+}
+function spawnImpactSpark(point) {
+  var light = new THREE.PointLight(0xffe0a0, 1.2, 1.5);
+  light.position.copy(point);
+  scene.add(light);
+  setTimeout(function () { scene.remove(light); }, 50);
+}
+
+var audioCtx = null;
+function ensureAudio() {
+  try { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (err) { audioCtx = null; }
+}
+function playTone(freqStart, freqEnd, duration, type, gainStart) {
+  if (!audioCtx) return;
+  try {
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freqStart, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(freqEnd, 1), audioCtx.currentTime + duration);
+    gain.gain.setValueAtTime(gainStart, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + duration + 0.02);
+  } catch (err) { /* ignore audio errors */ }
+}
+function playGunshotSound(vol) { playTone(180, 40, 0.12, 'square', (vol || 0.5) * 0.5); }
+function playEmptyClick() { playTone(800, 400, 0.04, 'square', 0.15); }
+function playBreachSound() { playTone(90, 20, 0.5, 'sawtooth', 0.6); }
+function playArrestSound() { playTone(440, 660, 0.15, 'sine', 0.25); }
+function playRescueChime() { playTone(523, 784, 0.3, 'sine', 0.25); }
+function playDownedSound() { playTone(150, 60, 0.08, 'triangle', 0.2); }
+
+var warningTimeout = null;
+function flashWarning(msg) {
+  var el = document.getElementById('warningToast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(warningTimeout);
+  warningTimeout = setTimeout(function () { el.classList.remove('show'); }, 2200);
+}
+function showHitMarker() {
+  var el = document.getElementById('hitmarker');
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.classList.add('show');
+  setTimeout(function () { el.classList.remove('show'); }, 150);
+}
+function flashDamage() {
+  var el = document.getElementById('damageFlash');
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.classList.add('show');
+  setTimeout(function () { el.classList.remove('show'); }, 250);
+}
+
+var flashlightOn = true;
+function toggleFlashlight() { flashlightOn = !flashlightOn; flashlight.visible = flashlightOn; }
+
+var cmdPanelTimeout = null;
+function toggleCommandPanel() {
+  var el = document.getElementById('commandPanel');
+  el.classList.toggle('show');
+  if (el.classList.contains('show')) {
+    clearTimeout(cmdPanelTimeout);
+    cmdPanelTimeout = setTimeout(function () { el.classList.remove('show'); }, 3000);
+  }
+}
+
+/* =====================================================================
+   HUD / MINIMAP
+   ===================================================================== */
+function drawMinimap(canvasEl, size) {
+  if (!canvasEl) return;
+  if (canvasEl.width !== size) { canvasEl.width = size; canvasEl.height = size; }
+  var ctx = canvasEl.getContext('2d');
+  ctx.fillStyle = '#0d100b';
+  ctx.fillRect(0, 0, size, size);
+  var scale = size / 24;
+  function toX(x) { return size / 2 + x * scale; }
+  function toY(z) { return size / 2 + z * scale; }
+
+  ctx.strokeStyle = 'rgba(140,150,120,0.5)';
+  ctx.lineWidth = 2;
+  colliders.forEach(function (w) {
+    if (w.isDoor && w.opened) return;
+    ctx.strokeRect(toX(w.x - w.w / 2), toY(w.z - w.d / 2), w.w * scale, w.d * scale);
+  });
+
+  ctx.fillStyle = '#5d9bd9';
+  teammates.forEach(function (tm) {
+    if (tm.hp > 0) { ctx.beginPath(); ctx.arc(toX(tm.pos.x), toY(tm.pos.z), 4, 0, Math.PI * 2); ctx.fill(); }
+  });
+
+  ctx.fillStyle = '#e05a4a';
+  enemies.forEach(function (en) {
+    if (!en.dead && !en.arrested && (en.state === 'combat' || en.state === 'alert')) {
+      ctx.beginPath(); ctx.arc(toX(en.pos.x), toY(en.pos.z), 4, 0, Math.PI * 2); ctx.fill();
+    }
+  });
+
+  ctx.save();
+  ctx.translate(toX(player.pos.x), toY(player.pos.z));
+  ctx.rotate(Math.atan2(playerFwd.x, playerFwd.z));
+  ctx.fillStyle = '#e8c84a';
+  ctx.beginPath();
+  ctx.moveTo(0, -7); ctx.lineTo(5, 6); ctx.lineTo(-5, 6); ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function buildObjectivesHtml() {
+  var suspectsDown = enemies.filter(function (e) { return e.dead || e.arrested; }).length;
+  var hostagesDone = hostages.filter(function (h) { return h.rescued; }).length;
+  var html = '';
+  html += '<li class="' + (suspectsDown === enemies.length ? 'done' : '') + '">NEUTRALIZE/ARREST SUSPECTS ' + suspectsDown + '/' + enemies.length + '</li>';
+  html += '<li class="' + (hostagesDone === hostages.length ? 'done' : '') + '">RESCUE HOSTAGES ' + hostagesDone + '/' + hostages.length + '</li>';
+  html += '<li class="' + (extractionReady ? '' : 'dim') + '">EXTRACT TEAM' + (extractionReady ? '' : ' (clear area first)') + '</li>';
+  return html;
+}
+
+function updateHUD() {
+  var hpPct = clamp(player.hp, 0, 100);
+  document.getElementById('healthFill').style.width = hpPct + '%';
+  document.getElementById('healthFill').style.background = hpPct > 50 ? '#5d8a3a' : (hpPct > 25 ? '#c98f2e' : '#b5392f');
+  document.getElementById('ammoText').textContent = player.reloading ? 'RELOAD...' : (player.ammoMag + ' / ' + player.ammoReserve);
+  document.getElementById('scorePanel').textContent = 'SCORE ' + player.score + '   ARRESTS ' + player.arrests + '   DOWNED ' + player.kills;
+
+  var objHtml = buildObjectivesHtml();
+  document.getElementById('objectivesList').innerHTML = objHtml;
+  document.getElementById('tabletObjectives').innerHTML = objHtml;
+
+  var tmHtml = '';
+  teammates.forEach(function (tm) {
+    var pct = tm.hp <= 0 ? 0 : Math.round(tm.hp);
+    tmHtml += '<div class="tm-row"><span>' + tm.name + '</span><div class="tm-bar"><div class="tm-fill" style="width:' + pct + '%"></div></div><span class="tm-state">' + (tm.hp <= 0 ? 'DOWN' : tm.state.toUpperCase()) + '</span></div>';
+  });
+  document.getElementById('teammatesPanel').innerHTML = tmHtml;
+
+  var promptEl = document.getElementById('interactPrompt');
+  var crosshairEl = document.getElementById('crosshair');
+  crosshairEl.classList.remove('interact', 'hostile');
+  if (currentInteract) {
+    var labels = { hostage: '[E] RESCUE HOSTAGE', arrest: '[E] ARREST SUSPECT', compel: '[E] ORDER HANDS UP', extract: '[E] EXTRACT TEAM' };
+    promptEl.textContent = labels[currentInteract.type];
+    promptEl.classList.add('show');
+    crosshairEl.classList.add(currentInteract.type === 'compel' ? 'hostile' : 'interact');
+  } else if (currentAimedDoor) {
+    promptEl.textContent = '[HOLD F] BREACH ' + currentAimedDoor.label;
+    promptEl.classList.add('show');
+  } else {
+    promptEl.classList.remove('show');
+  }
+
+  var chargeWrap = document.getElementById('chargeBarWrap');
+  if (chargeDoor) {
+    chargeWrap.classList.add('show');
+    document.getElementById('chargeFill').style.width = Math.min(100, (chargeProgress / CHARGE_TIME) * 100) + '%';
+  } else {
+    chargeWrap.classList.remove('show');
+  }
+
+  drawMinimap(document.getElementById('hudMinimap'), 170);
+  drawMinimap(document.getElementById('tabletMinimap'), 240);
+}
+
+/* =====================================================================
+   GAME STATE / INPUT
+   ===================================================================== */
+var gameState = 'menu'; // menu | playing | paused | tablet | ended
+var keys = {};
+var extractionReady = false;
+var currentInteract = null;
+var currentAimedDoor = null;
+var camDir = new THREE.Vector3();
+
+function openTablet() { gameState = 'tablet'; document.getElementById('tablet').classList.add('show'); }
+function closeTablet() { gameState = 'playing'; document.getElementById('tablet').classList.remove('show'); }
+
+window.addEventListener('keydown', function (e) {
+  if (e.code === 'Tab' || e.code === 'Space') e.preventDefault();
+  keys[e.code] = true;
+  if (e.repeat) return;
+
+  if (gameState !== 'playing') {
+    if (gameState === 'tablet' && (e.code === 'Tab' || e.code === 'Escape')) closeTablet();
+    return;
+  }
+
+  switch (e.code) {
+    case 'KeyR': startReload(); break;
+    case 'KeyE': handleInteract(currentInteract); break;
+    case 'Digit1': commandFollow(); break;
+    case 'Digit2': commandHold(); break;
+    case 'Digit3': commandBreach(); break;
+    case 'KeyQ': toggleCommandPanel(); break;
+    case 'KeyL': toggleFlashlight(); break;
+    case 'Tab': openTablet(); break;
+    case 'Escape': document.exitPointerLock(); break;
+  }
+});
+window.addEventListener('keyup', function (e) { keys[e.code] = false; });
+
+document.addEventListener('mousemove', function (e) {
+  if (document.pointerLockElement !== renderer.domElement) return;
+  if (gameState !== 'playing') return;
+  player.yaw -= e.movementX * SENS;
+  player.pitch -= e.movementY * SENS;
+  player.pitch = clamp(player.pitch, -Math.PI / 2 + 0.05, Math.PI / 2 - 0.05);
+});
+
+document.getElementById('blocker').addEventListener('click', function () {
+  ensureAudio();
+  renderer.domElement.requestPointerLock();
+});
+document.getElementById('pausedOverlay').addEventListener('click', function () {
+  renderer.domElement.requestPointerLock();
+});
+document.addEventListener('pointerlockchange', function () {
+  if (document.pointerLockElement === renderer.domElement) {
+    gameState = 'playing';
+    document.getElementById('blocker').classList.remove('show');
+    document.getElementById('pausedOverlay').classList.remove('show');
+  } else if (gameState === 'playing') {
+    gameState = 'paused';
+    document.getElementById('pausedOverlay').classList.add('show');
+  }
+});
+
+renderer.domElement.addEventListener('mousedown', function (e) {
+  if (e.button === 0 && gameState === 'playing') playerShoot();
+});
+renderer.domElement.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+document.getElementById('restartBtn').addEventListener('click', function () { location.reload(); });
+
+/* =====================================================================
+   END SCREENS
+   ===================================================================== */
+function showEndScreen(title, rank) {
+  document.getElementById('endTitle').textContent = title;
+  document.getElementById('endRank').textContent = rank;
+  document.getElementById('endStats').innerHTML =
+    'SCORE: ' + player.score + '<br>' +
+    'ARRESTS: ' + player.arrests + '<br>' +
+    'SUSPECTS DOWNED: ' + player.kills + '<br>' +
+    'HOSTAGES RESCUED: ' + player.hostagesRescued + ' / ' + hostages.length + '<br>' +
+    'CIVILIAN CASUALTIES: ' + player.civilianCasualties;
+  document.getElementById('endScreen').classList.add('show');
+}
+function missionComplete() {
+  if (gameState === 'ended') return;
+  gameState = 'ended';
+  document.exitPointerLock();
+  var rank;
+  if (player.civilianCasualties > 0) rank = 'D — REVIEW REQUIRED (CIVILIAN CASUALTY)';
+  else if (player.kills === 0) rank = 'S — EXEMPLARY (NO CASUALTIES)';
+  else if (player.arrests >= player.kills) rank = 'A — COMMENDABLE';
+  else rank = 'B — ACCEPTABLE';
+  showEndScreen('MISSION COMPLETE', rank);
+}
+function missionFailed() {
+  if (gameState === 'ended') return;
+  gameState = 'ended';
+  document.exitPointerLock();
+  showEndScreen('MISSION FAILED', 'OPERATOR DOWN');
+}
+
+/* =====================================================================
+   MAIN LOOP
+   ===================================================================== */
+function update(dt) {
+  camera.rotation.y = player.yaw;
+  camera.rotation.x = player.pitch;
+  camera.getWorldDirection(camDir);
+  playerFwd.copy(camDir); playerFwd.y = 0;
+  if (playerFwd.lengthSq() < 0.0001) playerFwd.set(0, 0, -1); else playerFwd.normalize();
+  playerRight.set(-playerFwd.z, 0, playerFwd.x);
+
+  handlePlayerMovement(dt);
+  updateBreach(dt);
+
+  breachDoors.forEach(function (d) {
+    if (d.opened && d.pivot.rotation.y > d.targetRot) {
+      d.pivot.rotation.y = Math.max(d.targetRot, d.pivot.rotation.y - dt * 4);
+    }
+  });
+
+  teammates.forEach(function (tm) { updateTeammate(tm, dt); });
+  enemies.forEach(function (en) { updateEnemy(en, dt); });
+  civilians.forEach(function (c) { updateCivilian(c, dt); });
+
+  flashlight.position.copy(camera.position);
+  flashlight.target.position.copy(camera.position).addScaledVector(camDir, 8);
+
+  var nowt = performance.now();
+  while (noiseEvents.length && nowt - noiseEvents[0].time > 2000) noiseEvents.shift();
+
+  extractionRing.visible = extractionReady;
+  if (extractionReady) extractionRing.rotation.z += dt;
+
+  currentInteract = getInteractTarget();
+  currentAimedDoor = chargeDoor ? null : findAimedBreachDoor();
+  updateHUD();
+}
+
+var lastTime = performance.now();
+function animate() {
+  requestAnimationFrame(animate);
+  var now = performance.now();
+  var dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+  if (gameState === 'playing' && !document.hidden) update(dt);
+  renderer.render(scene, camera);
+}
+camera.position.set(player.pos.x, EYE_HEIGHT, player.pos.z);
+animate();
+
+})();
+</script>
+</body>
+</html>
